@@ -124,7 +124,7 @@ tasks.jacocoTestCoverageVerification {
     classDirectories.setFrom(tasks.jacocoTestReport.get().classDirectories)
 
     val excludesList = listOf(
-        "rk.powermilk.search.MainKt*",
+        "rk.powermilk.request.MainKt*",
     )
 
     violationRules {
