@@ -1,4 +1,4 @@
-rootProject.name = "cache-with-expiration"
+rootProject.name = "http-dsl"
 
 pluginManagement {
     repositories {

@@ -59,22 +59,6 @@ object RequestTemplates {
     }
 }
 
-fun exampleAuthenticated() {
-    RequestTemplates.authenticated(
-        baseUrl = "https://api.example.com",
-        token = "secret-token"
-    ) {
-        path("/users/123")
-        method(HttpMethod.PATCH)
-
-        body {
-            json {
-                "email" to "newemail@example.com"
-            }
-        }
-    }
-}
-
 fun HttpRequest.validate(): Result<HttpRequest> {
     return runCatching {
         require(url.startsWith("https://")) {
@@ -89,24 +73,6 @@ fun HttpRequest.validate(): Result<HttpRequest> {
 
         this
     }
-}
-
-fun exampleValidation() {
-    val result = httpRequest {
-        url("https://api.example.com/users")
-        method(HttpMethod.POST)
-
-        body {
-            json {
-                "name" to "John"
-            }
-        }
-    }.validate()
-
-    result.fold(
-        onSuccess = { request -> println("Valid request: $request") },
-        onFailure = { error -> println("Invalid request: ${error.message}") }
-    )
 }
 
 interface RequestInterceptor {
@@ -125,10 +91,7 @@ class LoggingInterceptor : RequestInterceptor {
 
 class RetryInterceptor(private val maxRetries: Int = 3) : RequestInterceptor {
     override fun intercept(request: HttpRequest): HttpRequest {
-        // W prawdziwej implementacji dodalibyśmy metadata o retry
-        return request.copy(
-            headers = request.headers + ("X-Max-Retries" to maxRetries.toString())
-        )
+        return request.copy(headers = request.headers + ("X-Max-Retries" to maxRetries.toString()))
     }
 }
 
@@ -140,23 +103,6 @@ class RequestPipeline(
             interceptor.intercept(req)
         }
     }
-}
-
-
-fun exampleInterceptors() {
-    val pipeline = RequestPipeline(
-        listOf(
-            LoggingInterceptor(),
-            RetryInterceptor(maxRetries = 3)
-        )
-    )
-
-    val request = httpRequest {
-        url("https://api.example.com/users")
-        method(HttpMethod.GET)
-    }
-
-    pipeline.execute(request)
 }
 
 class UrlBuilder(private val base: String) {
@@ -197,24 +143,6 @@ fun httpRequestWithUrl(
     }
 }
 
-fun exampleTypeSafeUrl() {
-    httpRequestWithUrl(
-        baseUrl = "https://api.example.com",
-        urlBlock = {
-            segment("users")
-            segment("123")
-            segment("posts")
-            query("limit", "10")
-            query("offset", "0")
-        }
-    ) {
-        method(HttpMethod.GET)
-        headers {
-            "Accept" to "application/json"
-        }
-    }
-}
-
 class BatchRequestBuilder {
     private val requests = mutableListOf<HttpRequest>()
 
@@ -227,27 +155,6 @@ class BatchRequestBuilder {
 
 fun batchRequests(block: BatchRequestBuilder.() -> Unit): List<HttpRequest> {
     return BatchRequestBuilder().apply(block).build()
-}
-
-fun exampleBatch() {
-    val requests = batchRequests {
-        request {
-            url("https://api.example.com/users/1")
-            method(HttpMethod.GET)
-        }
-
-        request {
-            url("https://api.example.com/users/2")
-            method(HttpMethod.GET)
-        }
-
-        request {
-            url("https://api.example.com/posts")
-            method(HttpMethod.GET)
-        }
-    }
-
-    println("Created ${requests.size} requests")
 }
 
 fun HttpRequestBuilder.conditionalHeaders(
@@ -268,31 +175,6 @@ fun HttpRequestBuilder.conditionalBody(
     }
 }
 
-// Użycie:
-fun exampleConditional(includeAuth: Boolean, includeBody: Boolean) {
-    httpRequest {
-        url("https://api.example.com/users")
-        method(HttpMethod.POST)
-
-        conditionalHeaders(includeAuth) {
-            "Authorization" to "Bearer token"
-        }
-
-        conditionalBody(includeBody) {
-            json {
-                "name" to "John"
-            }
-        }
-    }
-}
-
-// ============================================
-// 7. Request Cloning & Modification
-// ============================================
-
-/**
- * Extension do modyfikacji istniejących requestów
- */
 fun HttpRequest.modify(block: HttpRequestBuilder.() -> Unit): HttpRequest {
     return httpRequest {
         url(this@modify.url)
@@ -337,36 +219,6 @@ fun HttpRequest.modify(block: HttpRequestBuilder.() -> Unit): HttpRequest {
     }
 }
 
-// Użycie:
-fun exampleModification() {
-    val originalRequest = httpRequest {
-        url("https://api.example.com/users")
-        method(HttpMethod.GET)
-    }
-
-    originalRequest.modify {
-        method(HttpMethod.POST)
-        body {
-            json {
-                "name" to "Jane"
-            }
-        }
-    }
-}
-
-// ============================================
-// 8. Smart Defaults with Config
-// ============================================
-
-/**
- * Configuration object dla default values
- */
-data class RequestConfig(
-    val defaultTimeout: Long = 5000,
-    val defaultHeaders: Map<String, String> = emptyMap(),
-    val baseUrl: String = ""
-)
-
 class ConfigurableRequestBuilder(private val config: RequestConfig) {
     fun build(block: HttpRequestBuilder.() -> Unit): HttpRequest {
         return httpRequest {
@@ -387,24 +239,5 @@ class ConfigurableRequestBuilder(private val config: RequestConfig) {
             // Apply user configuration
             block()
         }
-    }
-}
-
-// Użycie:
-fun exampleConfiguration() {
-    val config = RequestConfig(
-        defaultTimeout = 10000,
-        defaultHeaders = mapOf(
-            "User-Agent" to "MyApp/1.0",
-            "Accept" to "application/json"
-        ),
-        baseUrl = "https://api.example.com"
-    )
-
-    val builder = ConfigurableRequestBuilder(config)
-
-    builder.build {
-        url("${builder}") // Would need access to config.baseUrl
-        method(HttpMethod.GET)
     }
 }
