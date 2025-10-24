@@ -7,5 +7,5 @@ data class HttpRequest(
     val method: HttpMethod,
     val headers: Map<String, String>,
     val body: RequestBody?,
-    val timeout: Timeout
+    val timeout: Timeout,
 )

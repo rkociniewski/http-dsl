@@ -3,6 +3,7 @@ package rk.powermilk.request.model
 import org.junit.jupiter.api.Test
 import rk.powermilk.request.dsl.httpRequest
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class TimeoutBuilderExtendedTest {
 
@@ -24,6 +25,36 @@ class TimeoutBuilderExtendedTest {
     }
 
     @Test
+    fun `should allow null connect timeout`() {
+        val request = httpRequest {
+            url("https://api.example.com/users")
+
+            timeout {
+                connect = null
+                read = 5000
+                write = 3000
+            }
+        }
+
+        assertNull(request.timeout.connect)
+    }
+
+    @Test
+    fun `should allow null read timeout`() {
+        val request = httpRequest {
+            url("https://api.example.com/users")
+
+            timeout {
+                connect = 5000
+                read = null
+                write = 3000
+            }
+        }
+
+        assertNull(request.timeout.read)
+    }
+
+    @Test
     fun `should allow null write timeout`() {
         val request = httpRequest {
             url("https://api.example.com/users")
@@ -35,6 +66,6 @@ class TimeoutBuilderExtendedTest {
             }
         }
 
-        assertEquals(null, request.timeout.write)
+        assertNull(request.timeout.write)
     }
 }

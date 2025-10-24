@@ -2,22 +2,35 @@ package rk.powermilk.request.dsl
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import rk.powermilk.request.constant.ErrorMessage
 import rk.powermilk.request.enums.HttpMethod
 import rk.powermilk.request.model.RequestBody
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+
+const val PLAIN_TEXT = "Plain text content"
+const val CONTENT_TYPE_JSON = "application/json"
+const val USER_URL = "https://api.example.com/users"
+const val HEADER_CONTENT_TYPE = "Content-Type"
+const val HEADER_AUTH = "Authorization"
+const val HEADER_X_CUSTOM = "X-Custom-Header"
+const val BEARER_TOKEN = "Bearer token123"
+const val CUSTOM_VALUE = "custom-value"
+const val CONTENT_TYPE_TEXT  = "text/plain"
+const val URL_EXAMPLE  = "https://api.example.com"
 
 class HttpDslTest {
 
     @Test
     fun `should build minimal GET request`() {
         val request = httpRequest {
-            url("https://api.example.com/users")
+            url(USER_URL)
         }
 
-        assertEquals("https://api.example.com/users", request.url)
+        assertEquals(USER_URL, request.url)
         assertEquals(HttpMethod.GET, request.method)
         assertEquals(emptyMap(), request.headers)
         assertNull(request.body)
@@ -26,7 +39,7 @@ class HttpDslTest {
     @Test
     fun `should build POST request with JSON body`() {
         val request = httpRequest {
-            url("https://api.example.com/users")
+            url(USER_URL)
             method(HttpMethod.POST)
 
             body {
@@ -42,7 +55,7 @@ class HttpDslTest {
         assertNotNull(request.body)
         assertIs<RequestBody.JsonBody>(request.body)
 
-        val jsonBody = request.body as RequestBody.JsonBody
+        val jsonBody = request.body
         assertEquals("John", jsonBody.data["name"])
         assertEquals(30, jsonBody.data["age"])
         assertEquals(true, jsonBody.data["active"])
@@ -51,25 +64,25 @@ class HttpDslTest {
     @Test
     fun `should build request with headers`() {
         val request = httpRequest {
-            url("https://api.example.com/users")
+            url(USER_URL)
 
             headers {
-                "Content-Type" to "application/json"
-                "Authorization" to "Bearer token123"
-                "X-Custom-Header" to "custom-value"
+                HEADER_CONTENT_TYPE to CONTENT_TYPE_JSON
+                HEADER_AUTH to BEARER_TOKEN
+                HEADER_X_CUSTOM to CUSTOM_VALUE
             }
         }
 
         assertEquals(3, request.headers.size)
-        assertEquals("application/json", request.headers["Content-Type"])
-        assertEquals("Bearer token123", request.headers["Authorization"])
-        assertEquals("custom-value", request.headers["X-Custom-Header"])
+        assertEquals(CONTENT_TYPE_JSON, request.headers[HEADER_CONTENT_TYPE])
+        assertEquals(BEARER_TOKEN, request.headers[HEADER_AUTH])
+        assertEquals(CUSTOM_VALUE, request.headers[HEADER_X_CUSTOM])
     }
 
     @Test
     fun `should build request with custom timeout`() {
         val request = httpRequest {
-            url("https://api.example.com/users")
+            url(USER_URL)
 
             timeout {
                 connect = 3000
@@ -84,22 +97,22 @@ class HttpDslTest {
     @Test
     fun `should build request with text body`() {
         val request = httpRequest {
-            url("https://api.example.com/data")
+            url("${URL_EXAMPLE}/data")
             method(HttpMethod.POST)
 
             body {
-                text("Plain text content")
+                text(PLAIN_TEXT)
             }
         }
 
         assertIs<RequestBody.TextBody>(request.body)
-        assertEquals("Plain text content", (request.body as RequestBody.TextBody).text)
+        assertEquals(PLAIN_TEXT, (request.body).text)
     }
 
     @Test
     fun `should build request with nested JSON`() {
         val request = httpRequest {
-            url("https://api.example.com/users")
+            url(USER_URL)
             method(HttpMethod.POST)
 
             body {
@@ -118,22 +131,117 @@ class HttpDslTest {
         val jsonBody = request.body as RequestBody.JsonBody
         assertEquals("John", jsonBody.data["name"])
 
-        @Suppress("UNCHECKED_CAST")
-        val address = jsonBody.data["address"] as Map<String, Any?>
+        val address = jsonBody.data["address"] as Map<*, *>
         assertEquals("Main St", address["street"])
         assertEquals("New York", address["city"])
         assertEquals("10001", address["zip"])
     }
 
     @Test
+    fun `should throw exception with empty JSON key`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(USER_URL)
+                method(HttpMethod.POST)
+
+                body {
+                    json {
+                        "" to "John"
+                        nested("address") {
+                            "street" to "Main St"
+                            "city" to "New York"
+                            "zip" to "10001"
+                        }
+                        "emails" to listOf("john@example.com", "j.doe@example.com")
+                    }
+                }
+            }
+        }
+
+        assertEquals(ErrorMessage.EMPTY_JSON_KEY, exception.message)
+    }
+
+    @Test
+    fun `should throw exception with blank JSON key`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(USER_URL)
+                method(HttpMethod.POST)
+
+                body {
+                    json {
+                        "   " to "John"
+                        nested("address") {
+                            "street" to "Main St"
+                            "city" to "New York"
+                            "zip" to "10001"
+                        }
+                        "emails" to listOf("john@example.com", "j.doe@example.com")
+                    }
+                }
+            }
+        }
+
+        assertEquals(ErrorMessage.BLANK_JSON_KEY, exception.message)
+    }
+
+    @Test
+    fun `should throw exception with empty nested JSON key`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(USER_URL)
+                method(HttpMethod.POST)
+
+                body {
+                    json {
+                        "name" to "John"
+                        nested("address") {
+                            "" to "Main St"
+                            "city" to "New York"
+                            "zip" to "10001"
+                        }
+                        "emails" to listOf("john@example.com", "j.doe@example.com")
+                    }
+                }
+            }
+        }
+
+        assertEquals(ErrorMessage.EMPTY_JSON_KEY, exception.message)
+    }
+
+    @Test
+    fun `should throw exception with blank nested JSON key`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(USER_URL)
+                method(HttpMethod.POST)
+
+                body {
+                    json {
+                        "name" to "John"
+                        nested("address") {
+                            "   " to "Main St"
+                            "city" to "New York"
+                            "zip" to "10001"
+                        }
+                        "emails" to listOf("john@example.com", "j.doe@example.com")
+                    }
+                }
+            }
+        }
+
+        assertEquals(ErrorMessage.BLANK_JSON_KEY, exception.message)
+    }
+
+    @Test
     fun `should build complex request with all features`() {
         val request = httpRequest {
-            url("https://api.example.com/users")
+            url(USER_URL)
             method(HttpMethod.POST)
 
             headers {
-                "Content-Type" to "application/json"
-                "Authorization" to "Bearer token123"
+                HEADER_CONTENT_TYPE to CONTENT_TYPE_JSON
+                HEADER_AUTH to BEARER_TOKEN
             }
 
             body {
@@ -150,7 +258,7 @@ class HttpDslTest {
             }
         }
 
-        assertEquals("https://api.example.com/users", request.url)
+        assertEquals(USER_URL, request.url)
         assertEquals(HttpMethod.POST, request.method)
         assertEquals(2, request.headers.size)
         assertNotNull(request.body)
@@ -160,69 +268,145 @@ class HttpDslTest {
 
     @Test
     fun `should throw exception when URL is missing`() {
-        val exception = assertThrows<IllegalStateException> {
+        val exception = assertFailsWith<IllegalStateException> {
             httpRequest {
                 method(HttpMethod.GET)
             }
         }
-        assertEquals("URL is required", exception.message)
+        assertEquals(ErrorMessage.REQUIRED_URL, exception.message)
+    }
+
+    @Test
+    fun `should throw exception when URL is empty`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                method(HttpMethod.GET)
+                url("")
+            }
+        }
+        assertEquals(ErrorMessage.EMPTY_URL, exception.message)
     }
 
     @Test
     fun `should throw exception when URL is blank`() {
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertFailsWith<IllegalArgumentException> {
             httpRequest {
                 url("   ")
             }
         }
-        assertEquals("URL cannot be blank", exception.message)
+        assertEquals(ErrorMessage.BLANK_URL, exception.message)
     }
 
     @Test
     fun `should throw exception when header name is blank`() {
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertFailsWith<IllegalArgumentException> {
             httpRequest {
-                url("https://api.example.com")
+                url(URL_EXAMPLE)
+                headers {
+                    " " to "value"
+                }
+            }
+        }
+        assertEquals(ErrorMessage.BLANK_HEADER_NAME, exception.message)
+    }
+
+    @Test
+    fun `should throw exception when header name is empty`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(URL_EXAMPLE)
                 headers {
                     "" to "value"
                 }
             }
         }
-        assertEquals("Header name cannot be blank", exception.message)
+        assertEquals(ErrorMessage.EMPTY_HEADER_NAME, exception.message)
     }
 
     @Test
     fun `should throw exception when header value is blank`() {
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertFailsWith<IllegalArgumentException> {
             httpRequest {
-                url("https://api.example.com")
+                url(URL_EXAMPLE)
                 headers {
-                    "Content-Type" to "   "
+                    HEADER_CONTENT_TYPE to "   "
                 }
             }
         }
-        assertEquals("Header value cannot be blank", exception.message)
+        assertEquals(ErrorMessage.BLANK_HEADER_VALUE, exception.message)
+    }
+
+    @Test
+    fun `should throw exception when header value is empty`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(URL_EXAMPLE)
+                headers {
+                    HEADER_CONTENT_TYPE to ""
+                }
+            }
+        }
+        assertEquals(ErrorMessage.EMPTY_HEADER_VALUE, exception.message)
     }
 
     @Test
     fun `should throw exception when body is set twice`() {
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertFailsWith<IllegalStateException> {
             httpRequest {
-                url("https://api.example.com")
+                url(URL_EXAMPLE)
                 body {
                     text("First body")
                     text("Second body")
                 }
             }
         }
-        assertEquals("Body can only be set once", exception.message)
+        assertEquals(ErrorMessage.BODY_SET_ONCE, exception.message)
+    }
+
+    @Test
+    fun `should throw exception when text body is blank`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(URL_EXAMPLE)
+                body {
+                    text("    ")
+                }
+            }
+        }
+        assertEquals(ErrorMessage.BLANK_TEXT_CONTENT, exception.message)
+    }
+
+    @Test
+    fun `should throw exception when text body is empty`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(URL_EXAMPLE)
+                body {
+                    text("")
+                }
+            }
+        }
+        assertEquals(ErrorMessage.EMPTY_TEXT_CONTENT, exception.message)
+    }
+
+    @Test
+    fun `should throw exception when raw body is empty`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(URL_EXAMPLE)
+                body {
+                    raw(byteArrayOf())
+                }
+            }
+        }
+        assertEquals(ErrorMessage.EMPTY_RAW_CONTENT, exception.message)
     }
 
     @Test
     fun `should throw exception when JSON and text body are both set`() {
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertFailsWith<IllegalStateException> {
             httpRequest {
-                url("https://api.example.com")
+                url(URL_EXAMPLE)
                 body {
                     json {
                         "key" to "value"
@@ -231,73 +415,86 @@ class HttpDslTest {
                 }
             }
         }
-        assertEquals("Body can only be set once", exception.message)
+        assertEquals(ErrorMessage.BODY_SET_ONCE, exception.message)
     }
 
     @Test
     fun `should throw exception for negative connect timeout`() {
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertFailsWith<IllegalArgumentException> {
             httpRequest {
-                url("https://api.example.com")
+                url(URL_EXAMPLE)
                 timeout {
                     connect = -1000
                 }
             }
         }
-        assertEquals("Connect timeout must be positive", exception.message)
+        assertEquals(ErrorMessage.TIMEOUT_NEGATIVE_CONNECT, exception.message)
     }
 
     @Test
     fun `should throw exception for negative read timeout`() {
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertFailsWith<IllegalArgumentException> {
             httpRequest {
-                url("https://api.example.com")
+                url(URL_EXAMPLE)
                 timeout {
                     read = -5000
                 }
             }
         }
-        assertEquals("Read timeout must be positive", exception.message)
+        assertEquals(ErrorMessage.TIMEOUT_NEGATIVE_READ, exception.message)
+    }
+
+    @Test
+    fun `should throw exception for negative write timeout`() {
+        val exception = assertFailsWith<IllegalArgumentException> {
+            httpRequest {
+                url(URL_EXAMPLE)
+                timeout {
+                    write = -5000
+                }
+            }
+        }
+        assertEquals(ErrorMessage.TIMEOUT_NEGATIVE_WRITE, exception.message)
     }
 
     @Test
     fun `should allow multiple headers blocks`() {
         val request = httpRequest {
-            url("https://api.example.com")
+            url(URL_EXAMPLE)
 
             headers {
-                "Content-Type" to "application/json"
+                HEADER_CONTENT_TYPE to CONTENT_TYPE_JSON
             }
 
             headers {
-                "Authorization" to "Bearer token"
+                HEADER_AUTH to BEARER_TOKEN
             }
         }
 
         assertEquals(2, request.headers.size)
-        assertEquals("application/json", request.headers["Content-Type"])
-        assertEquals("Bearer token", request.headers["Authorization"])
+        assertEquals(CONTENT_TYPE_JSON, request.headers[HEADER_CONTENT_TYPE])
+        assertEquals(BEARER_TOKEN, request.headers[HEADER_AUTH])
     }
 
     @Test
     fun `should override header when set twice`() {
         val request = httpRequest {
-            url("https://api.example.com")
+            url(URL_EXAMPLE)
 
             headers {
-                "Content-Type" to "text/plain"
-                "Content-Type" to "application/json"
+                HEADER_CONTENT_TYPE to CONTENT_TYPE_TEXT
+                HEADER_CONTENT_TYPE to CONTENT_TYPE_JSON
             }
         }
 
         assertEquals(1, request.headers.size)
-        assertEquals("application/json", request.headers["Content-Type"])
+        assertEquals(CONTENT_TYPE_JSON, request.headers[HEADER_CONTENT_TYPE])
     }
 
     @Test
     fun `should handle null values in JSON`() {
         val request = httpRequest {
-            url("https://api.example.com")
+            url(URL_EXAMPLE)
             method(HttpMethod.POST)
 
             body {
@@ -319,7 +516,7 @@ class HttpDslTest {
     @Test
     fun `should handle empty collections in JSON`() {
         val request = httpRequest {
-            url("https://api.example.com")
+            url(URL_EXAMPLE)
             method(HttpMethod.POST)
 
             body {
@@ -338,9 +535,9 @@ class HttpDslTest {
     @Test
     fun `should test immutability of headers`() {
         val request = httpRequest {
-            url("https://api.example.com")
+            url(URL_EXAMPLE)
             headers {
-                "Content-Type" to "application/json"
+                HEADER_CONTENT_TYPE to CONTENT_TYPE_JSON
             }
         }
 

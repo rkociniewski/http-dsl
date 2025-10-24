@@ -3,7 +3,7 @@ package rk.powermilk.request
 import rk.powermilk.request.dsl.httpRequest
 import rk.powermilk.request.enums.HttpMethod
 
-
+@Suppress("MagicNumber")
 fun main() {
     val request = httpRequest {
         url("https://api.example.com/users")
